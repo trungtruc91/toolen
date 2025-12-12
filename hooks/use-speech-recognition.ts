@@ -24,6 +24,7 @@ export function useSpeechRecognition(
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const finalTranscriptRef = useRef('')
+  const isListeningRef = useRef(false) // Track listening state for auto-restart
 
   useEffect(() => {
     // Check browser support
@@ -106,7 +107,21 @@ export function useSpeechRecognition(
 
     // Handle end
     recognition.onend = () => {
-      setIsListening(false)
+      // Auto-restart if still supposed to be listening
+      // Web Speech API stops after ~15-30 seconds of silence
+      if (isListeningRef.current && recognitionRef.current) {
+        try {
+          recognitionRef.current.start()
+          console.log('Speech recognition auto-restarted')
+        } catch (err) {
+          console.error('Failed to restart recognition:', err)
+          setIsListening(false)
+          isListeningRef.current = false
+        }
+      } else {
+        setIsListening(false)
+        isListeningRef.current = false
+      }
       setInterimText('') // Clear interim on end
     }
 
@@ -123,6 +138,7 @@ export function useSpeechRecognition(
     try {
       recognitionRef.current.start()
       setIsListening(true)
+      isListeningRef.current = true
       setError(null)
     } catch (err) {
       console.error('Failed to start recognition:', err)
@@ -133,6 +149,7 @@ export function useSpeechRecognition(
   const stopListening = () => {
     if (!recognitionRef.current) return
 
+    isListeningRef.current = false
     recognitionRef.current.stop()
     setIsListening(false)
     setInterimText('') // Clear interim when stopped
